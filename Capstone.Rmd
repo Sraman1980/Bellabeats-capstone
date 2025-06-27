@@ -1,0 +1,836 @@
+---
+title: "capstone"
+output: html_document
+date: "2025-06-25"
+---```
+
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(janitor)
+library(skimr)
+library(ggplot2)
+library(scales)
+```
+
+```{r}
+getwd()
+```
+
+```{r}
+Daily_activity_1 <- read_csv("/Users/amsha/OneDrive/Documents/test/mturkfitbit_export_3.12.16-4.11.16/Fitabase Data 3.12.16-4.11.16/dailyActivity_merged.csv")
+Daily_Activity_2 <- read_csv("/Users/amsha/OneDrive/Documents/test/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/dailyActivity_merged.csv")
+Hourly_Calories_1 <- read_csv("/Users/amsha/OneDrive/Documents/test/mturkfitbit_export_3.12.16-4.11.16/Fitabase Data 3.12.16-4.11.16/hourlyCalories_merged.csv")
+Hourly_Calories_2 <- read_csv("/Users/amsha/OneDrive/Documents/test/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/hourlyCalories_merged.csv")
+Hourly_Steps_1 <- read_csv("/Users/amsha/OneDrive/Documents/test/mturkfitbit_export_3.12.16-4.11.16/Fitabase Data 3.12.16-4.11.16/hourlySteps_merged.csv")
+Hourly_Steps_2 <- read_csv("/Users/amsha/OneDrive/Documents/test/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/hourlySteps_merged.csv")
+Minute_Sleep_1 <- read_csv("/Users/amsha/OneDrive/Documents/test/mturkfitbit_export_3.12.16-4.11.16/Fitabase Data 3.12.16-4.11.16/minuteSleep_merged.csv")
+Minute_Sleep_2 <- read_csv("/Users/amsha/OneDrive/Documents/test/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/minuteSleep_merged.csv")
+Weight_log_1 <- read_csv("/Users/amsha/OneDrive/Documents/test/mturkfitbit_export_3.12.16-4.11.16/Fitabase Data 3.12.16-4.11.16/weightLogInfo_merged.csv")
+Weight_Log_2 <- read_csv("/Users/amsha/OneDrive/Documents/test/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/weightLogInfo_merged.csv")
+METs_1 <- read_csv("/Users/amsha/OneDrive/Documents/test/mturkfitbit_export_3.12.16-4.11.16/Fitabase Data 3.12.16-4.11.16/minuteMETsNarrow_merged.csv")
+METs_2 <- read_csv("/Users/amsha/OneDrive/Documents/test/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/minuteMETsNarrow_merged.csv")
+```
+Data Exploration¶
+Since the data is split across multiple spreadsheets—one for each month—I first needed to check the column names and dataset structure before merging them. This step ensures consistency across the datasets, allowing for accurate analysis in later stages.
+
+To prepare the Daily Activity data, I imported the two monthly files separately, checked for consistency in column names and formats, and then combined them using bind_rows(). I also converted the date column to proper date format and added a "Month" column to allow monthly trend comparisons.
+
+~ Daily Activity
+
+```{r}
+# Check column names and structure
+
+colnames(Daily_activity_1)
+colnames(Daily_Activity_2)
+glimpse(Daily_activity_1)
+glimpse(Daily_Activity_2)
+```
+```{r}
+# Combine the two data frames
+
+daily_activity_combined <- bind_rows(Daily_activity_1, Daily_Activity_2)
+
+# Convert ActivityDate to Date formart
+
+daily_activity_combined <- daily_activity_combined %>%
+  mutate(ActivityDate = mdy(ActivityDate))
+
+# Add a Month column for further analysis
+
+daily_activity_combined <- daily_activity_combined %>%
+  mutate(Month = month(ActivityDate, label = TRUE, abbr = TRUE))
+
+# Remove duplicates if any
+
+daily_activity_combined <- daily_activity_combined %>%
+  distinct()
+
+# Preview the first rows
+
+head(daily_activity_combined)
+
+# Validate total rows
+
+nrow(Daily_activity_1) + nrow(Daily_Activity_2)
+nrow(daily_activity_combined)
+```
+
+The Daily Activity data was provided in two separate files for March and April. Since both data frames had consistent column names and structures, I combined them using bind_rows(). I also formatted the date column and created a new "Month" column to facilitate monthly comparisons. Finally, I removed any potential duplicate entries to ensure clean data for analysis.
+
+```{r}
+# Count unique users by Id
+
+n_distinct(daily_activity_combined$Id)
+
+daily_activity_combined %>%
+  count(Id, name = "days_recorded") %>%
+  arrange(desc(days_recorded))
+```
+The combined Daily Activity dataset includes data from 35 unique users. Each user is identified by a unique Id and has activity records spanning across the months of March and April. To continue the analysis, I followed the same steps for the other datasets.
+
+~ Hourly Calories
+
+```{r}
+# Check column names and structure
+
+colnames(Hourly_Calories_1)
+colnames(Hourly_Calories_2)
+
+glimpse(Hourly_Calories_1)
+glimpse(Hourly_Calories_2)
+```
+```{r}
+# Convert ActivityHour column to datetime format
+
+Hourly_Calories_1 <- Hourly_Calories_1 %>%
+  mutate(ActivityHour = str_trim(ActivityHour),
+         ActivityHour = parse_date_time(ActivityHour, orders = "mdy HMS p"))
+
+Hourly_Calories_2 <- Hourly_Calories_2 %>%
+  mutate(ActivityHour = str_trim(ActivityHour),
+         ActivityHour = parse_date_time(ActivityHour, orders = "mdy HMS p"))
+
+# Combine both data frames
+hourly_calories_combined <- bind_rows(Hourly_Calories_1, Hourly_Calories_2)
+
+
+# Validate Total rows
+nrow(Hourly_Calories_1) + nrow(Hourly_Calories_2)
+nrow(hourly_calories_combined)
+```
+
+```{r}
+# Check for duplicated row
+duplicated_rows_calories <- hourly_calories_combined %>%
+  duplicated() %>%
+  sum()
+# Print the number of duplicated
+print(duplicated_rows_calories)
+```
+```{r}
+# Remove duplicate entries
+
+hourly_calories_combined <- hourly_calories_combined %>%
+distinct()
+
+nrow(Hourly_Calories_1) + nrow(Hourly_Calories_2)
+nrow(hourly_calories_combined)
+```
+```{r}
+# Count unique users by Id
+n_distinct(hourly_calories_combined$Id)
+
+hourly_calories_combined %>%
+  count(Id, name = "days_recorded") %>%
+  arrange(desc(days_recorded))
+```
+
+The combined Hourly Calories dataset includes data from 35 unique users. The Hourly Calories data were combined after verifying that both datasets had consistent column names and formats. The ActivityHour column was converted to datetime format to ensure accurate time-based analysis. Duplicate entries were removed to avoid redundancy in the dataset.
+
+~ Hourly Steps
+
+```{r}
+colnames(Hourly_Steps_1)
+colnames(Hourly_Steps_2)
+
+glimpse(Hourly_Steps_1)
+glimpse(Hourly_Steps_2)
+```
+```{r}
+# Convert ActivityHour to datetime format
+
+Hourly_Steps_1 <- Hourly_Steps_1 %>%
+  mutate(ActivityHour = str_trim(ActivityHour),
+         ActivityHour = parse_date_time(ActivityHour, orders = "mdy HMS p"))
+
+Hourly_Steps_2 <- Hourly_Steps_2 %>%
+  mutate(ActivityHour = str_trim(ActivityHour),
+         ActivityHour = parse_date_time(ActivityHour, orders = "mdy HMS p"))
+
+# Combine the two datasets
+hourly_steps_combined <- bind_rows(Hourly_Steps_1, Hourly_Steps_2)
+
+# Check if number of rows matches
+nrow(Hourly_Steps_1) + nrow(Hourly_Steps_2)
+nrow(hourly_steps_combined)
+
+# Check for duplicated row
+duplicated_rows_steps <- hourly_steps_combined %>%
+  duplicated() %>%
+  sum()
+
+# Print the number of duplicated
+print(duplicated_rows_steps)
+
+```
+
+```{r}
+# Remove duplicated 
+hourly_steps_combined <- hourly_steps_combined %>%
+  distinct()
+
+# Check if number of rows matches
+nrow(Hourly_Steps_1) + nrow(Hourly_Steps_2)
+nrow(hourly_steps_combined)
+```
+```{r}
+# Count unique users by Id
+n_distinct(hourly_steps_combined$Id)
+
+hourly_steps_combined %>%
+  count(Id, name = "days_recorded") %>%
+  arrange(desc(days_recorded))
+```
+The combined Hourly Steps dataset includes data from 35 unique users. The Steps Calories data were combined after verifying that both datasets had consistent column names and formats. The ActivityHour column was converted to datetime format to ensure accurate time-based analysis. Duplicate entries were removed to avoid redundancy in the dataset.
+
+~ Minute Sleep
+
+```{r}
+# Check Column names
+
+colnames(Minute_Sleep_1)
+colnames(Minute_Sleep_2)
+
+glimpse(Minute_Sleep_1)
+glimpse(Minute_Sleep_2)
+```
+```{r}
+# Convert SleepMinute(date) to date time format
+Minute_Sleep_1 <- Minute_Sleep_1 %>%
+  mutate(date = mdy_hms(date))
+
+Minute_Sleep_2 <- Minute_Sleep_2 %>%
+  mutate(date = mdy_hms(date))
+
+# Combine the two datasets
+minute_sleep_combined <- bind_rows(Minute_Sleep_1, Minute_Sleep_2)
+
+# Check if number of rows matches
+nrow(Minute_Sleep_1) + nrow(Minute_Sleep_2)
+nrow(minute_sleep_combined)
+
+# Check for duplicated row
+minute_sleep_duplicated <- minute_sleep_combined %>%
+  duplicated() %>%
+  sum()
+# Print the number of duplicated
+print(minute_sleep_duplicated)
+```
+```{r}
+# Remove duplicated 
+minute_sleep_combined <- minute_sleep_combined %>%
+  distinct()
+
+# Check if number of rows matches
+nrow(Minute_Sleep_1) + nrow(Minute_Sleep_2)
+nrow(minute_sleep_combined)
+```
+```{r}
+# Count unique users by Id
+n_distinct(minute_sleep_combined$Id)
+
+minute_sleep_combined %>%
+  count(Id, name = "days_recorded") %>%
+  arrange(desc(days_recorded))
+```
+The combined Minute Sleep dataset includes data from 25 unique users. The minute-level sleep data were merged after confirming consistent column names and formats across both datasets. The date column was converted to datetime format to ensure accurate time-based analysis. Duplicate records were removed to maintain data integrity and avoid redundancy.
+
+~ Weight_Log_Info
+
+```{r}
+colnames(Weight_log_1)
+colnames(Weight_Log_2)
+
+glimpse(Weight_log_1)
+glimpse(Weight_Log_2)
+```
+```{r}
+# Convert Date to datetime format
+
+Weight_log_1 <- Weight_log_1 %>%
+  mutate(Date = mdy_hms(Date))
+
+Weight_Log_2 <- Weight_Log_2 %>%
+  mutate(Date = mdy_hms(Date))
+
+# Combine the two datasets
+weight_log_combined <- bind_rows(Weight_log_1, Weight_Log_2)
+
+# Check the number of rows
+nrow(Weight_log_1) + nrow(Weight_Log_2)
+nrow(weight_log_combined)
+
+# Check for duplicated row
+weight_log_duplicated <- weight_log_combined %>%
+  duplicated() %>%
+  sum()
+# Print the number of duplicated
+print(weight_log_duplicated)
+
+```
+```{r}
+#Remove duplicated rows
+weight_log_combined <- weight_log_combined %>%
+  distinct()
+
+# Check the number of rows
+nrow(Weight_log_1) + nrow(Weight_Log_2)
+nrow(weight_log_combined)
+```
+```{r}
+# Count unique users by Id
+
+n_distinct(weight_log_combined$Id)
+weight_log_combined %>%
+  count(Id, name = "days_recorded") %>%
+  arrange(desc(days_recorded))
+```
+
+The combined Weight Log dataset includes data from 13 unique users. After confirming consistent column names and formats, the two datasets were merged. The Date column was converted to datetime format, and duplicates were removed. The Fat column contains missing values (NA), which were retained for completeness.
+
+~ METs
+```{r}
+colnames(METs_1)
+colnames(METs_2)
+
+glimpse(METs_1)
+glimpse(METs_2)
+```
+```{r}
+# Convert ActivityMinute column to datetime format
+
+METs_1 <- METs_1 %>%
+  mutate(ActivityMinute = str_trim(ActivityMinute),
+         ActivityMinute = parse_date_time(ActivityMinute, orders = "mdy HMS p"))
+
+METs_2 <- METs_2 %>%
+  mutate(ActivityMinute = str_trim(ActivityMinute),
+         ActivityMinute = parse_date_time(ActivityMinute, orders = "mdy HMS p"))
+
+# Combine both data frames
+METs_combined <- bind_rows(METs_1, METs_2)
+
+
+# Validate Total rows
+nrow(METs_1) + nrow(METs_2)
+nrow(METs_combined)
+
+# Check for duplicated row
+mets_duplicated <- METs_combined %>%
+  duplicated() %>%
+  sum()
+# Print the number of duplicated
+print(mets_duplicated)
+```
+```{r}
+#Remove duplicated rows
+METs_combined <- METs_combined %>%
+  distinct()
+
+# Validate Total rows
+nrow(METs_1) + nrow(METs_2)
+nrow(METs_combined)
+```
+```{r}
+# Count unique users by Id
+n_distinct(METs_combined$Id)
+METs_combined %>%
+  count(Id, name = "days_recorded") %>%
+  arrange(desc(days_recorded))
+```
+The combined Minute METs dataset contains data from 35 unique users. The datasets were merged after confirming consistent formats. The ActivityMinute column was converted to datetime, and duplicates were removed.
+
+Summary of Data Preparation
+The original dataset was described as containing data from 30 Fitbit users. However, after importing and cleaning the data, we identified a total of 35 unique users across the majority of the datasets.
+
+Each file was examined and cleaned using a consistent process:
+
+Column names and formats were verified and standardized.
+Datetime columns (e.g., ActivityHour, ActivityMinute) were converted to proper datetime objects using the mdy_hms(), mdy_hm(), or parse_date_time() functions to ensure accurate time-based analysis.
+Duplicated rows were identified and removed to avoid redundancy.
+Datasets were combined using bind_rows() after ensuring they had consistent structures.
+**Notable exceptions:
+
+The Minute Sleep dataset contains data from 25 users.
+The Weight Log Info dataset contains data from only 13 users and includes missing values in the Fat column.
+Process
+
+**Exploring Key Datasets
+
+Initial exploration helps us understand the data structure and detect any inconsistencies. Summary statistics reveal possible outliers or missing data.
+
+```{r}
+# Previewing the cleaned datasets
+head(daily_activity_combined)
+head(hourly_calories_combined)
+head(hourly_steps_combined)
+head(METs_combined)
+head(minute_sleep_combined)
+head(weight_log_combined)
+
+# Viewing column names
+colnames(daily_activity_combined)
+colnames(hourly_calories_combined)
+colnames(hourly_steps_combined)
+colnames(METs_combined)
+colnames(minute_sleep_combined)
+colnames(weight_log_combined)
+
+# Summary statistics of key variables
+summary(daily_activity_combined %>% select(TotalSteps, TotalDistance, SedentaryMinutes))
+summary(minute_sleep_combined$value)
+summary(weight_log_combined %>% select(WeightKg, BMI))
+```
+
+Summary Statistics:
+
+Average steps per day: 7,281
+Average sedentary minutes: 992
+Max sedentary time: 1440 minutes (entire day)
+Average weight: 72.5 kg
+BMI range: 21.45 to 47.54
+In Sleep Minute data each row represents one minute of sleep. The values range from 1 to 3, likely indicating different sleep states (e.g., awake, light, deep).
+Merging Datasets
+
+This combined dataset will allow us to explore the relationships between physical activity, steps and calories burned at an hourly level.
+
+```{r}
+# Joining hourly calories and steps for future comparion
+hourly_combined <- left_join(hourly_steps_combined, hourly_calories_combined, 
+                             by = c("Id", "ActivityHour"))
+
+# Preview merged dataset
+head(hourly_combined)
+
+# Count unique users 
+n_distinct(hourly_combined$Id)
+hourly_combined %>%
+  count(Id, name = "days_recorded") %>%
+  arrange(desc(days_recorded))
+```
+
+Creating New Variable
+
+In this step, we will enhance the daily activity and sleep datasets by adding date-related features, cleaning duplicates, and merging them to prepare for further analysis. This allows us to explore user behavior patterns across days and weeks. Transforming minutes into hours helps simplify analysis and makes trends easier to identify.
+
+```{r}
+# Adding weekday and week to daily activity
+daily_activity_combined <- daily_activity_combined %>%
+  mutate(ActivityDate = as.Date(ActivityDate),
+         weekday = weekdays(ActivityDate),
+         week = format(ActivityDate, "%Y-%U"),
+         date = ActivityDate)
+
+# Converting sleep duration from minutes to hours
+daily_sleep_summary <- minute_sleep_combined %>%
+  mutate(date = as.Date(date, format = "%m/%d/%Y")) %>%
+  group_by(Id, date) %>%
+  summarise(TotalMinutesAsleep = sum(value),
+            SleepHours = sum(value) / 60,
+            .groups = 'drop')
+
+# Remove duplicate dates per user by aggregating
+daily_activity_combined_clean <- daily_activity_combined %>%
+  group_by(Id, date) %>%
+  summarise(
+    TotalSteps = sum(TotalSteps, na.rm = TRUE),
+    TotalDistance = sum(TotalDistance, na.rm = TRUE),
+    SedentaryMinutes = sum(SedentaryMinutes, na.rm = TRUE),
+    VeryActiveMinutes = sum(VeryActiveMinutes, na.rm = TRUE),
+    FairlyActiveMinutes = sum(FairlyActiveMinutes, na.rm = TRUE),
+    LightlyActiveMinutes = sum(LightlyActiveMinutes, na.rm = TRUE),
+    Calories = sum(Calories, na.rm = TRUE),
+    weekday = first(weekday),
+    week = first(week),
+    .groups = "drop"
+)
+
+# Joining datasets - preserving all activity records
+activity_sleep_merged <- left_join(daily_activity_combined_clean, 
+                                   daily_sleep_summary,
+                                   by = c("Id", "date"))
+
+# Previewing the result
+head(activity_sleep_merged)
+
+# Count unique users 
+n_distinct(activity_sleep_merged$Id)
+activity_sleep_merged %>%
+  count(Id, name = "days_recorded") %>%
+  arrange(desc(days_recorded))
+```
+
+```{r}
+#Check for duplicated
+activity_sleep_merged %>%
+  count(Id, date) %>%
+  filter(n > 1)
+
+hourly_combined %>%
+  count(Id, ActivityHour) %>%
+  filter(n > 1)
+```
+```{r}
+# Checking for missing values
+sapply(weight_log_combined, function(x)sum(is.na(x)))
+
+# Removing columns not needed for analysis
+weight_log_combined <- weight_log_combined %>%
+  select(-WeightPounds, -IsManualReport)
+
+# Count unique users by Id
+n_distinct(weight_log_combined$Id)
+weight_log_combined %>%
+  count(Id, name = "days_recorded") %>%
+  arrange(desc(days_recorded))
+```
+
+```{r}
+# Final NA check
+sapply(activity_sleep_merged, function(x) sum(is.na(x)))
+sapply(METs_combined, function(x)sum(is.na(x)))
+sapply(hourly_combined, function(x) sum(is.na(x)))
+```
+
+Results:
+
+No missing values found in mets_combined and hourly_combined
+740 missing values were found in the TotalMinutesAsleep and SleepHours colmuns.
+These missing sleep values are expected — they represent days when users either didn’t wear the sleep tracker or it failed to record. Using left_join() preserved all activity data, even if sleep was not recorded, which is the correct approach for a comprehensive analysis.
+
+Creating Tables for Average Steps and Sleep by Weekday
+
+```{r}
+# Average steps per weekday
+avg_steps_weekday <- activity_sleep_merged %>%
+  group_by(weekday) %>%
+  summarise(avg_steps = mean(TotalSteps, na.rm = TRUE)) %>%
+  arrange(match(weekday, c("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday", "Saturday")))
+
+# Average sleep hours per weekday
+avg_sleep_weekday <- activity_sleep_merged %>%
+  group_by(weekday) %>%
+  summarise(avg_sleep_hours = mean(SleepHours, na.rm = TRUE)) %>%
+  arrange(match(weekday, c("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday", "Saturday")))
+
+# Preview of Results
+
+head(avg_steps_weekday)
+head(avg_sleep_weekday)
+```
+
+Summary of Data Process¶
+This section outlines the steps taken to prepare the datasets for analysis, ensuring data integrity, consistency, and readiness for exploration.
+
+1. Explored and Previewed the Datasets
+Used head() and colnames() to inspect the structure of each dataset.
+Reviewed summary statistics for key variables such as steps, sedentary time, and weight.
+2. Merged Relevant Datasets
+Combined Hourly_Steps_Combined and Hourly_Calories_Combined into a single dataset (hourly_combined) using left_join() by Id and ActivityHour.
+Merged daily activity and sleep datasets (daily_activity_combined and daily_sleep_summary) to form activity_sleep_merged, preserving all activity data even when sleep data was missing.
+3. Created New Time-Based Variables
+Added weekday and week columns based on the activity date to support temporal analyses.
+Converted total sleep duration from minutes to hours for easier interpretation.
+4. Handled Duplicates
+Identified and removed duplicated records based on Id and date in the daily datasets using group_by() and summarise().
+5. Checked for Missing Values
+Detected missing values in the SleepHours and TotalMinutesAsleep columns—740 values in total—due to users not tracking sleep every day.
+No missing values found in mets_combined and hourly_combined.
+Weight log had some missing values in the Fat column, which were retained for transparency during interpretation.
+6. Cleaned and Aggregated Data
+Removed unnecessary columns such as WeightPounds and IsManualReport from the weight log dataset.
+Aggregated daily activity data to ensure one record per user per day.
+7. Created Summary Tables
+Generated summary tables for:
+Average daily steps by weekday (avg_steps_weekday)
+Average sleep hours by weekday (avg_sleep_weekday)
+These tables enable insights into weekly behavioral patterns, supporting targeted wellness recommendations.
+Analyze and Share
+In this phase, the processed data is explored to generate insights that help answer the business questions defined in the 'Ask' phase. The analysis begins by addressing the first question: What are some trends in smart device usage?
+
+Physical Activity Levels by Weekday
+
+We want to understand user activity patterns across weekdays, grouped by activity type.
+
+```{r}
+activity_summary_long <- daily_activity_combined_clean %>%
+  group_by(weekday) %>%
+  summarise(
+    VeryActive = mean(VeryActiveMinutes, na.rm = TRUE),
+    FairlyActive = mean(FairlyActiveMinutes, na.rm = TRUE),
+    LightActive = mean(LightlyActiveMinutes, na.rm = TRUE),
+    Sedentary = mean(SedentaryMinutes, na.rm = TRUE)
+  ) %>%
+  pivot_longer(
+    cols = c(VeryActive, FairlyActive, LightActive, Sedentary),
+    names_to = "ActivityLevel",
+    values_to = "Minutes"
+  )
+
+activity_summary_long$weekday <- factor(
+  activity_summary_long$weekday,
+  levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+)
+ggplot(activity_summary_long, aes(x = weekday, y = Minutes, fill = ActivityLevel)) + geom_bar(stat = "identity", position = position_dodge()) +
+  labs(
+    title = "Average Activity Minutes by Type and Weekday",
+    x = "Weekday",
+    y = "Minutes"
+  ) +
+  scale_fill_brewer(palette = "Set2") +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+The bar chart illustrates the average number of minutes users spend in different activity levels (Very Active, Fairly Active, Lightly Active, and Sedentary) for each day of the week. The following key patterns were observed:
+
+Sedentary minutes dominate all days of the week, with users spending on average over 900 minutes (15 hours) per day in sedentary behavior. Tuesday shows the highest sedentary average.
+Lightly Active minutes show some variation across the week, with slightly higher activity on weekends, especially on Saturday.
+Fairly Active and Very Active minutes remain consistently low throughout the week, with Very Active minutes averaging below 30 minutes per day. There is no significant increase on any specific day.
+Overall, users show a highly sedentary lifestyle, which might indicate a lack of structured exercise or physical engagement, regardless of the day of the week.
+
+**BMI Distribution**
+```{r}
+ggplot(weight_log_combined, aes(x = BMI)) +
+  geom_histogram(binwidth = 1, fill = "darkblue", color = "white") +
+  labs(title = "BMI Distribution", x = "BMI", y = "Count") +
+  theme_minimal()
+```
+
+It is crucial to acknowledge that these insights are based on a small subset of the total participants (13 out of 35). Therefore, the findings might not be fully representative of the entire user base.
+
+The histogram shows a clear concentration of individuals within a Body Mass Index (BMI) range of approximately 24 to 27. The highest frequency (the tallest bar) is observed around a BMI of 25. This suggests that a significant portion of the observed population falls within this BMI category.
+
+While the majority of individuals are clustered in the mid-20s for BMI, there are also individuals with higher BMI values extending up to around 30, and even a few beyond that. This suggests the presence of individuals who might be classified as overweight or obese according to standard BMI categories.
+
+There are noticeable gaps in the distribution, particularly around BMI values of 31-39. This could be due to the specific sample of users in the dataset or might indicate a less common occurrence of BMIs in these ranges within this population. The small bars around BMI 39 and 43 suggest a very small number of individuals with these higher BMIs.
+
+**Participants categorized by body mass index**
+
+```{r}
+bmi_counts <- weight_log_combined %>%
+  mutate(
+    BMI_Category = case_when(
+      BMI < 18.5 ~ "Underweight",
+      BMI >= 18.5 & BMI < 25 ~ "Healthy weight",
+      BMI >= 25 & BMI < 30 ~ "Overweight",
+      BMI >= 30 ~ "Obese"
+    )) %>%
+group_by(Id) %>%
+  slice_tail(n=1) %>%
+  ungroup() %>%
+  count(BMI_Category)
+
+bmi_counts$BMI_Category <- factor(
+  bmi_counts$BMI_Category,
+  levels = c("Healthy weight", "Overweight", "Obese")
+)
+
+ggplot(bmi_counts, aes(x = BMI_Category, y = n, fill = BMI_Category)) +
+  geom_col() +
+  labs(title = "Participants Categorized by Body Mass Indesx (BMI)",
+       x = "BMI Category",
+       y = "Number of Participants") +
+  scale_fill_manual(values = c("Healthy weight" = "green",
+                               "Overweight" = "orange",
+                               "Obese" = "firebrick",
+                               "Underweight" = "lightblue")) +
+  theme_minimal()
+```
+It is crucial to acknowledge that these insights are based on a small subset of the total participants (13 out of 35). Therefore, the findings might not be fully representative of the entire user base.
+
+Among the 13 participants with weight data, the largest group is categorized as "Overweight," with 7 individuals. This suggests that within this limited sample, a slight majority have a BMI above the healthy range but below the obese threshold.
+
+Even with the small sample size, the distribution shows more participants in the overweight category, followed by the healthy weight category, and the fewest in the obese category within this subset.
+
+**Calories Burned vc. Activity Level**
+
+```{r}
+activity_calories <- daily_activity_combined_clean %>%
+  select(VeryActiveMinutes, FairlyActiveMinutes, LightlyActiveMinutes, SedentaryMinutes, Calories)
+
+ggplot(activity_calories, aes(x = VeryActiveMinutes, y = Calories)) + 
+  geom_point(alpha = 0.5, color = "darkorange") +
+  geom_smooth(method = "loess", se = TRUE) +
+  labs(title = "Calories Burned vs. Very Active Minutes", x = "Very Active Minutes", y = "Calories") +
+  theme_minimal()
+```
+The scatter plot demonstrates a clear positive correlation between very active minutes and calories burned. As the number of very active minutes increase, the number of calories burned also tends to rise. The loess smoothing line with a confidence interval (shaded area) shows a nonlinear upward trend, indicating that even moderate increases in active time can lead to significant gains in calories burned. This insights supports the idea that encouraging users to increase their very active minutes can be an effective strategy to enhance their calorie expenditure.
+
+**Steps vc. Calories**
+
+```{r}
+ggplot(daily_activity_combined_clean, aes(x = TotalSteps, y = Calories)) +
+  geom_point(alpha = 0.5, color = "orange") +
+  geom_smooth(method = "loess", color = "darkgreen", fill = "palegreen3") +
+  labs(title = "Steps vs. Calories Burned", x = "Total Steps", y = "Calories") +
+  theme_minimal()
+```
+
+There is a strong positive correlation between total steps and calories burned. As the number of steps increases, the number of calories burned also tends to increase. The confidence interval (shaded area) widens as step count increases, suggestion greater variability in calories burned at higher activity levels. This may be due to differences in individual metabolism, workout intensity, or body weight.
+
+**Steps vs. 10,000 Daily Goal**
+
+For this analysis, we will use the goal of 10,000 steps per day. However, recent studies show that this number can vary — ranging from 4,000 to 18,000 steps per day for adults, and from 10,000 to 16,000 steps per day for children and adolescents.
+
+```{r}
+daily_goal <- 10000
+
+ggplot(daily_activity_combined_clean, aes(x = TotalSteps)) +
+  geom_histogram(binwidth = 1000, fill = "blue", color = "white") +
+  geom_vline(xintercept = daily_goal, color = "red", linetype = "dashed") +
+  labs(title = "Distribution of Daily Steps (Goal = 10,000)", x = "Total Steps", y = "Count") +
+  theme_minimal()
+```
+A significant number of users fall below the 10,000-step mark, indicating that most users do not meet the recommended daily goal.
+There is a large concentration of users with fewer than 5,000 steps, suggesting a relatively sedentary lifestyle for a considerable portion of the population.
+The distribution shows a gradual decline as the step count increases, with relatively few users achieving more than 15,000 steps in a day.
+The peak at zero or very low steps may represent days when devices were not worn or data was not properly recorded.
+
+**Average Steps vs. Average Calories at different hours in the day**
+
+```{r}
+hourly_by_hour <- hourly_combined %>%
+  mutate(Hour = hour(ActivityHour)) %>%
+  group_by(Hour) %>%
+  summarise(
+    AvgSteps = mean(StepTotal, na.rm = TRUE),
+    AvgCalories = mean(Calories, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(hourly_by_hour, aes(x = Hour, y = AvgSteps)) +
+  geom_col(fill = "darkseagreen") +
+  labs(title = "Average Steps by Hour of the Day",
+       x = "Hour of Day",
+       y = "Average Steps") +
+  scale_x_continuous(breaks = 0:23) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(hourly_by_hour, aes(x = Hour, y = AvgCalories)) +
+  geom_col(fill = "orange") +
+  labs(title = "Average Calories Burned by Hour of the Day",
+       x = "Hour of Day",
+       y = "Average Calories") +
+  scale_x_continuous(breaks = 0:23) +
+  theme_minimal()
+```
+
+```{r}
+hourly_summary <- hourly_combined %>%
+  mutate(Hour = hour(ActivityHour)) %>%
+  group_by(Hour) %>%
+  summarise(
+    AvgSteps = mean(StepTotal, na.rm = TRUE),
+    AvgCalories = mean(Calories, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+hourly_long <- hourly_summary %>%
+  pivot_longer(cols = c(AvgSteps, AvgCalories),
+               names_to = "Variable",
+               values_to = "Value")
+
+ggplot(hourly_long, aes(x = Hour, y = Value, fill = Variable)) +
+  geom_col(position = "dodge") +
+  labs(title = "Steps vs. Calories Burned by Hour of Day",
+       x = "Hour of Day",
+       y = "Average Value",
+       fill = "Metric") +
+  scale_x_continuous(breaks = 0:23) +
+  scale_fill_manual(values = c("AvgSteps" = "darkgreen", "AvgCalories" = "tomato")) +
+  theme_minimal()
+```
+
+Activity Peaks: The graph clearly indicates that physical activity, measured by the average number of steps, peaks during the late morning and afternoon hours, specifically between 9 AM and 6 PM (hours 9 to 18). The highest average number of steps is observed around 12 PM to 1 PM (hour 12 to 13).
+
+Correlation: There's a noticeable positive correlation between the average number of steps taken and the average calories burned throughout the day. Periods of higher step activity correspond with higher calorie expenditure. This aligns with the understanding that more physical movement leads to burning more calories.
+
+**Sleep Duration by Weekday**
+```{r}
+sleep_weekday <- activity_sleep_merged %>%
+  group_by(weekday) %>%
+  summarise(avg_sleep = mean(SleepHours, na.rm = TRUE))
+
+ggplot(sleep_weekday, aes(x = reorder(weekday, avg_sleep), y = avg_sleep)) +
+  geom_bar(stat = "identity", fill = "forestgreen") +
+  labs(title = "Average Sleep Hours by Weekday", x = "Weekday", y = "Sleep Hours") +
+  theme_minimal()
+```
+The most prominent observation is the increase in average sleep hours on the weekends (Saturday and Sunday) compared to the weekdays. Users appear to sleep significantly longer on these days, indicating a tendency to catch up on rest.
+
+The average sleep hours during the weekdays (Monday through Friday, and also including Thursday in this graph's ordering) are relatively consistent, hovering around the 7 to 7.5-hour mark. This suggests a more regular sleep schedule is maintained during the work or school week.
+
+Interestingly, Thursday shows the lowest average sleep hours among all the weekdays presented. This could be due to various factors, such as mid-week fatigue or social engagements extending into the late evening. Further investigation might be needed to understand this specific trend.
+
+Sunday exhibits the highest average sleep hours, surpassing Saturday. This might suggest that users take the opportunity to have the longest sleep on the final day of the weekend before the start of the new week.
+
+```{r}
+ggplot(activity_sleep_merged, aes(x = SleepHours, y = SedentaryMinutes)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm") +
+  labs(title = "Relationship Between Sleep Hours and Sedentary Minutes", x = "Sleep Hours", y = "Sedentary Minutes") +
+  theme_minimal()
+```
+
+The graph displays a clear negative correlation between the number of sleep hours and the number of sedentary minutes. As sleep hours increase, the number of sedentary minutes tends to decrease, and vice versa.
+
+Individuals who report fewer hours of sleep tend to have a higher number of sedentary minutes. This could suggest that those with less sleep might feel more fatigued during the day and engage in more sedentary behaviors.
+
+Conversely, individuals who sleep for longer durations tend to have fewer sedentary minutes. This might indicate that sufficient sleep contributes to higher energy levels and a greater propensity for being active rather than sedentary.
+
+***Act***
+
+2. How can these trends be applied to Bellabeat customers?
+Although the dataset does not specify users’ gender, Bellabeat primarily targets women. Therefore, all insights and recommendations are tailored with this audience in mind.
+
+The analysis of smart device usage reveals key behavioral patterns related to physical activity, sleep, and sedentary time. These findings can support the development of personalized features and wellness strategies for Bellabeat’s users:
+
+Timing of Activity: Users tend to be most active during standard daytime hours. Bellabeat can leverage this by sending motivational prompts or recommending ideal workout times based on individual habits.
+
+Steps and Calorie Trends: Most users fall short of the recommended 10,000 steps per day. Introducing features like a “Daily Step Streak” can encourage consistency and incremental progress.
+
+Sedentary Behavior and Sleep Patterns: A segment of users displays both high sedentary time and poor sleep. Personalized interventions promoting better sleep hygiene and regular movement can help improve overall well-being.
+
+Correlations for Coaching: The negative correlation between sleep duration and sedentary minutes suggests that promoting healthy sleep habits could reduce inactivity. Bellabeat could integrate behavior-based coaching to support these improvements.
+
+3. How can these trends influence Bellabeat’s marketing strategy?
+Based on the analysis, the following marketing strategies are recommended to increase engagement and promote healthier lifestyles:
+
+Smart Reminders: Use inactivity alerts to encourage movement, especially during low-activity periods. This aligns with users’ typical daily routines and can boost step counts.
+
+Goal Setting + Rewards: Offer personalized fitness goals with gamified rewards (e.g., badges or streaks) to enhance motivation and satisfaction.
+
+Community Engagement: Include in-app social features that allow users to share progress and support one another. Social accountability can help sustain healthy habits.
+
+Sleep Behavior Support: Promote content and features that educate users on sleep hygiene, while encouraging reduced sedentary time through timely prompts and wellness tips.
+
+Educational Content: Share actionable health insights via blogs, articles, and notifications to help users make informed lifestyle decisions.
+
+To validate these strategies, Bellabeat could prototype the new features and conduct A/B testing to evaluate user response and optimize effectiveness.
